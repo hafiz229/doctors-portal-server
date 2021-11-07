@@ -1,9 +1,30 @@
 const express = require("express");
 const app = express();
 const cors = require("cors");
+// firebase admin sdk (jwt)
+const admin = require("firebase-admin");
 require("dotenv").config();
 const port = process.env.PORT || 5000;
 const { MongoClient } = require("mongodb");
+
+// firebase admin sdk (jwt)
+const serviceAccount = require("./doctors-portal-229-firebase-adminsdk.json");
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+// verifyToken (jwt)
+async function verifyToken(req, res, next) {
+  if (req.headers?.authorization?.startsWith("Bearer ")) {
+    const token = req.headers.authorization.split(" ")[1];
+
+    try {
+      const decodedUser = await admin.auth().verifyIdToken(token);
+      req.decodedEmail = decodedUser.email;
+    } catch {}
+  }
+  next();
+}
 
 //middleware
 app.use(cors());
@@ -28,7 +49,7 @@ async function run() {
     const usersCollection = database.collection("users");
 
     // get all appointments from the database
-    app.get("/appointments", async (req, res) => {
+    app.get("/appointments", verifyToken, async (req, res) => {
       const email = req.query.email;
       const date = new Date(req.query.date).toLocaleDateString();
       const query = { email: email, date: date };
@@ -43,6 +64,18 @@ async function run() {
       const result = await appointmentsCollection.insertOne(appointment);
       //   console.log(result);
       res.json(result);
+    });
+
+    // get whether an user is Admin or not
+    app.get("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      let isAdmin = false;
+      if (user?.role === "admin") {
+        isAdmin = true;
+      }
+      res.json({ admin: isAdmin });
     });
 
     // post a new user to users collection
@@ -68,6 +101,28 @@ async function run() {
         options
       );
       res.json(result);
+    });
+
+    // update user as admin (jwt)
+    app.put("/users/admin", verifyToken, async (req, res) => {
+      const user = req.body;
+      // update for jwt token
+      const requester = req.decodedEmail;
+      if (requester) {
+        const requesterAccount = await usersCollection.findOne({
+          email: requester,
+        });
+        if (requesterAccount.role === "admin") {
+          const filter = { email: user.email };
+          const updateDoc = { $set: { role: "admin" } };
+          const result = await usersCollection.updateOne(filter, updateDoc);
+          res.json(result);
+        }
+      } else {
+        res
+          .status(403)
+          .json({ message: "You do not have access to make admin" });
+      }
     });
   } finally {
     //   await client.close();
