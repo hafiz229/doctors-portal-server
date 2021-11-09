@@ -8,7 +8,9 @@ const port = process.env.PORT || 5000;
 const { MongoClient } = require("mongodb");
 
 // firebase admin sdk (jwt)
-const serviceAccount = require("./doctors-portal-229-firebase-adminsdk.json");
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+// const serviceAccount = require("./doctors-portal-229-firebase-adminsdk.json");
+
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
