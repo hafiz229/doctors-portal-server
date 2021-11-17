@@ -85,6 +85,13 @@ async function run() {
       res.json(result);
     });
 
+    // get all doctors from doctors collection
+    app.get("/doctors", async (req, res) => {
+      const cursor = await doctorsCollection.find({});
+      const doctors = await cursor.toArray();
+      res.json(doctors);
+    });
+
     // post a new doctor to doctors collection
     app.post("/doctors", async (req, res) => {
       const name = req.body.name;
